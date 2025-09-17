@@ -1,80 +1,78 @@
-from fastapi import FastAPI, WebSocket, Depends, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-import json
-import models, auth
+from passlib.context import CryptContext
+from models import SessionLocal, init_db, User, Diagram
 
 app = FastAPI()
 
+# CORS setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # allow frontend
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Serve React frontend
-app.mount("/", StaticFiles(directory="dist", html=True), name="frontend")
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# Initialize DB
+init_db()
 
-# -------------------
-# Auth Routes
-# -------------------
+# Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 
 @app.post("/register")
-def register(username: str, password: str, db: Session = Depends(auth.get_db)):
-    user = db.query(models.User).filter(models.User.username == username).first()
+def register(username: str, password: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
     if user:
-        raise HTTPException(status_code=400, detail="Username already taken")
-    hashed = auth.hash_password(password)
-    new_user = models.User(username=username, hashed_password=hashed)
+        raise HTTPException(status_code=400, detail="Username already exists")
+    hashed_pw = pwd_context.hash(password)
+    new_user = User(username=username, password=hashed_pw)
     db.add(new_user)
     db.commit()
+    db.refresh(new_user)
     return {"message": "User registered successfully"}
 
 
 @app.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(auth.get_db)):
-    user = db.query(models.User).filter(models.User.username == form_data.username).first()
-    if not user or not auth.verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    token = auth.create_access_token(data={"sub": user.username})
-    return {"access_token": token, "token_type": "bearer"}
+def login(username: str, password: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if not user or not pwd_context.verify(password, user.password):
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+    return {"message": "Login successful"}
 
 
 @app.post("/save_diagram")
-def save_diagram(content: str, user=Depends(auth.get_current_user), db: Session = Depends(auth.get_db)):
-    new_diag = models.Diagram(user_id=user.id, content=content)
-    db.add(new_diag)
+def save_diagram(username: str, content: str, db: Session = Depends(get_db)):
+    diagram = Diagram(owner=username, content=content)
+    db.add(diagram)
     db.commit()
+    db.refresh(diagram)
     return {"message": "Diagram saved"}
 
 
-@app.get("/my_diagrams")
-def get_diagrams(user=Depends(auth.get_current_user), db: Session = Depends(auth.get_db)):
-    diags = db.query(models.Diagram).filter(models.Diagram.user_id == user.id).all()
-    return [{"id": d.id, "content": d.content} for d in diags]
+@app.get("/diagrams/{username}")
+def get_diagrams(username: str, db: Session = Depends(get_db)):
+    diagrams = db.query(Diagram).filter(Diagram.owner == username).all()
+    return diagrams
 
 
-# -------------------
-# Whiteboard WebSocket
-# -------------------
-
-clients = []
-
+# WebSocket for real-time drawing
 @app.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
-    await ws.accept()
-    clients.append(ws)
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
     try:
         while True:
-            data = await ws.receive_text()
-            for client in clients:
-                if client != ws:
-                    await client.send_text(data)
-    except:
-        clients.remove(ws)
+            data = await websocket.receive_text()
+            await websocket.send_text(data)  # echo back to client
+    except WebSocketDisconnect:
+        pass
