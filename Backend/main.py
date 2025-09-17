@@ -6,8 +6,12 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from pydantic import BaseModel
 import models
-from models import user, Diagram
+from models import User, Diagram
 from database import engine, SessionLocal, Base
+
+# Create all tables
+Base.metadata.create_all(bind=engine)
+
 import os
 
 # Initialize FastAPI
