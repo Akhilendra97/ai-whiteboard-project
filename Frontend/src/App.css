@@ -1,0 +1,88 @@
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: #f5f7fb;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  padding: 30px;
+}
+
+.app {
+  text-align: center;
+  max-width: 900px;
+  width: 100%;
+  background: #fff;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+}
+
+h1 {
+  color: #007BFF;
+  margin-bottom: 20px;
+}
+
+.auth-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auth-box input {
+  padding: 12px;
+  font-size: 16px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.btn-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.register {
+  background: #28a745;
+  color: white;
+}
+
+.register:hover {
+  background: #218838;
+}
+
+.login {
+  background: #007BFF;
+  color: white;
+}
+
+.login:hover {
+  background: #0056b3;
+}
+
+.message {
+  margin-top: 10px;
+  color: #555;
+}
+
+.board {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+canvas {
+  border: 2px solid #007BFF;
+  border-radius: 10px;
+  background: #fff;
+  cursor: crosshair;
+}

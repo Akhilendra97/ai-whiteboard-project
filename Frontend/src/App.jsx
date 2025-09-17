@@ -1,138 +1,104 @@
-import { useRef, useState, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
+import "./App.css";
 
 function App() {
-  const canvasRef = useRef(null);
-  const ws = useRef(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-
-  const [token, setToken] = useState(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [diagrams, setDiagrams] = useState([]);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [message, setMessage] = useState("");
+  const canvasRef = useRef(null);
+  const ctxRef = useRef(null);
+  const drawing = useRef(false);
 
-  // connect WebSocket
-  useEffect(() => {
-    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-    ws.current = new WebSocket(`${protocol}://${window.location.host}/ws`);
-
-    ws.current.onmessage = (event) => {
-      const ctx = canvasRef.current.getContext("2d");
-      const obj = JSON.parse(event.data);
-      if (obj.x !== undefined && obj.y !== undefined) {
-        ctx.fillRect(obj.x, obj.y, 2, 2);
-      }
-    };
-
-    return () => ws.current.close();
-  }, []);
-
-  const startDrawing = () => setIsDrawing(true);
-  const stopDrawing = () => setIsDrawing(false);
-
-  const draw = (e) => {
-    if (!isDrawing) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const ctx = canvasRef.current.getContext("2d");
-    ctx.fillRect(x, y, 2, 2);
-
-    ws.current.send(JSON.stringify({ x, y }));
-  };
-
-  // -------------------------
-  // Auth + Diagram Functions
-  // -------------------------
-
-  const register = async () => {
-    await fetch(`/register?username=${username}&password=${password}`, {
-      method: "POST",
-    });
-    alert("Registered! Now log in.");
-  };
-
-  const login = async () => {
-    const res = await fetch("/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ username, password }),
-    });
+  // ------------------------
+  // Auth Handlers
+  // ------------------------
+  const handleRegister = async () => {
+    const res = await fetch("/register?username=" + username + "&password=" + password, { method: "POST" });
     const data = await res.json();
-    if (data.access_token) {
-      setToken(data.access_token);
-      alert("Logged in!");
+    if (res.ok) {
+      setMessage("✅ Registered successfully, now login!");
     } else {
-      alert("Login failed!");
+      setMessage("❌ " + data.detail);
     }
   };
 
-  const saveDiagram = async () => {
-    const content = canvasRef.current.toDataURL();
-    await fetch(`/save_diagram?content=${encodeURIComponent(content)}`, {
-      method: "POST",
-      headers: { Authorization: "Bearer " + token },
-    });
-    alert("Diagram saved!");
+  const handleLogin = async () => {
+    const res = await fetch("/login?username=" + username + "&password=" + password, { method: "POST" });
+    const data = await res.json();
+    if (res.ok) {
+      setIsLoggedIn(true);
+      setMessage("✅ Welcome, " + username + "!");
+    } else {
+      setMessage("❌ " + data.detail);
+    }
   };
 
-  const loadDiagrams = async () => {
-    const res = await fetch("/my_diagrams", {
-      headers: { Authorization: "Bearer " + token },
-    });
-    const data = await res.json();
-    setDiagrams(data);
+  // ------------------------
+  // Canvas Drawing
+  // ------------------------
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    canvas.width = 800;
+    canvas.height = 500;
+    const ctx = canvas.getContext("2d");
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#007BFF";
+    ctx.lineWidth = 3;
+    ctxRef.current = ctx;
+  }, []);
+
+  const startDrawing = (e) => {
+    drawing.current = true;
+    ctxRef.current.beginPath();
+    ctxRef.current.moveTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+  };
+
+  const draw = (e) => {
+    if (!drawing.current) return;
+    ctxRef.current.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+    ctxRef.current.stroke();
+  };
+
+  const stopDrawing = () => {
+    drawing.current = false;
+    ctxRef.current.closePath();
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>AI Whiteboard</h2>
+    <div className="app">
+      <h1>🖊️ AI Whiteboard</h1>
 
-      {!token ? (
-        <div>
+      {!isLoggedIn ? (
+        <div className="auth-box">
           <input
-            placeholder="username"
+            type="text"
+            placeholder="👤 Username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
           />
           <input
-            placeholder="password"
             type="password"
+            placeholder="🔒 Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          <button onClick={register}>Register</button>
-          <button onClick={login}>Login</button>
+          <div className="btn-row">
+            <button className="btn register" onClick={handleRegister}>Register</button>
+            <button className="btn login" onClick={handleLogin}>Login</button>
+          </div>
+          <p className="message">{message}</p>
         </div>
       ) : (
-        <div>
-          <button onClick={saveDiagram}>Save Diagram</button>
-          <button onClick={loadDiagrams}>Load My Diagrams</button>
-        </div>
-      )}
-
-      <canvas
-        ref={canvasRef}
-        width={800}
-        height={600}
-        onMouseDown={startDrawing}
-        onMouseUp={stopDrawing}
-        onMouseMove={draw}
-        style={{ border: "1px solid black", marginTop: "10px" }}
-      />
-
-      {diagrams.length > 0 && (
-        <div>
-          <h3>My Diagrams</h3>
-          {diagrams.map((d) => (
-            <img
-              key={d.id}
-              src={d.content}
-              alt="diagram"
-              width="200"
-              style={{ margin: "5px" }}
-            />
-          ))}
+        <div className="board">
+          <p className="welcome">Welcome, {username} 👋 Start drawing below:</p>
+          <canvas
+            ref={canvasRef}
+            onMouseDown={startDrawing}
+            onMouseMove={draw}
+            onMouseUp={stopDrawing}
+            onMouseLeave={stopDrawing}
+          />
         </div>
       )}
     </div>
