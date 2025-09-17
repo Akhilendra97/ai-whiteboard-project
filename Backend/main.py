@@ -1,7 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 import os
@@ -13,7 +12,7 @@ from models import SessionLocal, init_db, User, Diagram
 # -------------------------------------------------
 app = FastAPI()
 
-# CORS (allow frontend to talk to backend)
+# Allow frontend to talk to backend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,7 +24,7 @@ app.add_middleware(
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Initialize DB
+# Initialize DB (creates tables if not exist)
 init_db()
 
 # Dependency to get DB session
@@ -77,7 +76,7 @@ def get_diagrams(username: str, db: Session = Depends(get_db)):
     return diagrams
 
 # -------------------------------------------------
-# WebSocket (for live drawing)
+# WebSocket (for real-time drawing)
 # -------------------------------------------------
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -85,7 +84,7 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_text()
-            # Echo data back (can be improved to broadcast to multiple users)
+            # For now: echo data back to client
             await websocket.send_text(data)
     except WebSocketDisconnect:
         pass
@@ -96,10 +95,5 @@ async def websocket_endpoint(websocket: WebSocket):
 frontend_path = os.path.join(os.path.dirname(__file__), "dist")
 
 if os.path.exists(frontend_path):
-    # Serve static assets (JS, CSS, images)
-    app.mount("/static", StaticFiles(directory=os.path.join(frontend_path, "assets")), name="static")
-
-    # Serve React index.html at root
-    @app.get("/")
-    def serve_index():
-        return FileResponse(os.path.join(frontend_path, "index.html"))
+    # Serve entire dist folder (fixes blank screen issue)
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
