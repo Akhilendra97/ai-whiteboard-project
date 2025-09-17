@@ -1,31 +1,28 @@
-from sqlalchemy import Column, Integer, String, Text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine
-import os
+from sqlalchemy import Column, Integer, String, ForeignKey, Text
+from sqlalchemy.orm import relationship
+from database import Base
 
-# Use Railway PostgreSQL in production, fallback to local SQLite
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./diagrams.db")
-
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
 
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(50), unique=True, index=True, nullable=False)
-    password = Column(String(200), nullable=False)
+    username = Column(String, unique=True, index=True, nullable=False)
+    password = Column(String, nullable=False)  # Store hashed password
+
+    # Relationship: one user → many diagrams
+    diagrams = relationship("Diagram", back_populates="owner")
+
 
 class Diagram(Base):
     __tablename__ = "diagrams"
 
     id = Column(Integer, primary_key=True, index=True)
-    owner = Column(String(50), nullable=False)
-    content = Column(Text, nullable=False)
+    title = Column(String, index=True, nullable=False)  # Title of diagram
+    content = Column(Text, nullable=False)  # Store JSON string of canvas data
 
+    # Foreign key to user
+    owner_id = Column(Integer, ForeignKey("users.id"))
 
-def init_db():
-    Base.metadata.create_all(bind=engine)
+    # Relationship back to user
+    owner = relationship("User", back_populates="diagrams")

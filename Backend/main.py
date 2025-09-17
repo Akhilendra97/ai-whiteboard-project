@@ -1,33 +1,43 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
+from pydantic import BaseModel
+import models
+from models import user, Diagram
+from database import engine, SessionLocal, Base
 import os
 
-from models import SessionLocal, init_db, User, Diagram
-
-# -------------------------------------------------
-# App Setup
-# -------------------------------------------------
+# Initialize FastAPI
 app = FastAPI()
 
-# Allow frontend to talk to backend
+# Database setup
+models.Base.metadata.create_all(bind=engine)
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Allow frontend to call backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # You can restrict to your domain later
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# ----------- Auth Models -----------
+class UserCreate(BaseModel):
+    username: str
+    password: str
 
-# Initialize DB (creates tables if not exist)
-init_db()
+class UserLogin(BaseModel):
+    username: str
+    password: str
 
-# Dependency to get DB session
+# ----------- DB Dependency -----------
 def get_db():
     db = SessionLocal()
     try:
@@ -35,65 +45,32 @@ def get_db():
     finally:
         db.close()
 
-# -------------------------------------------------
-# Authentication Routes
-# -------------------------------------------------
+# ----------- Auth Routes -----------
 @app.post("/register")
-def register(username: str, password: str, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == username).first()
-    if user:
-        raise HTTPException(status_code=400, detail="Username already exists")
-    hashed_pw = pwd_context.hash(password)
-    new_user = User(username=username, password=hashed_pw)
+def register(user: UserCreate, db: Session = Depends(get_db)):
+    existing_user = db.query(models.User).filter(models.User.username == user.username).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    hashed_password = pwd_context.hash(user.password)
+    new_user = models.User(username=user.username, password=hashed_password)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
     return {"message": "User registered successfully"}
 
-
 @app.post("/login")
-def login(username: str, password: str, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == username).first()
-    if not user or not pwd_context.verify(password, user.password):
-        raise HTTPException(status_code=400, detail="Invalid credentials")
+def login(user: UserLogin, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(models.User.username == user.username).first()
+    if not db_user or not pwd_context.verify(user.password, db_user.password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     return {"message": "Login successful"}
 
-# -------------------------------------------------
-# Diagram Routes
-# -------------------------------------------------
-@app.post("/save_diagram")
-def save_diagram(username: str, content: str, db: Session = Depends(get_db)):
-    diagram = Diagram(owner=username, content=content)
-    db.add(diagram)
-    db.commit()
-    db.refresh(diagram)
-    return {"message": "Diagram saved"}
+# ----------- Serve React Frontend -----------
+frontend_dist = os.path.join(os.path.dirname(__file__), "dist")
 
+if os.path.exists(frontend_dist):
+    app.mount("/static", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="static")
 
-@app.get("/diagrams/{username}")
-def get_diagrams(username: str, db: Session = Depends(get_db)):
-    diagrams = db.query(Diagram).filter(Diagram.owner == username).all()
-    return diagrams
-
-# -------------------------------------------------
-# WebSocket (for real-time drawing)
-# -------------------------------------------------
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    try:
-        while True:
-            data = await websocket.receive_text()
-            # For now: echo data back to client
-            await websocket.send_text(data)
-    except WebSocketDisconnect:
-        pass
-
-# -------------------------------------------------
-# Serve Frontend (React build)
-# -------------------------------------------------
-frontend_path = os.path.join(os.path.dirname(__file__), "dist")
-
-if os.path.exists(frontend_path):
-    # Serve entire dist folder (fixes blank screen issue)
-    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
+    @app.get("/")
+    async def serve_frontend():
+        return FileResponse(os.path.join(frontend_dist, "index.html"))
