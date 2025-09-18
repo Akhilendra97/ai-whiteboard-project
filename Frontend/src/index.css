@@ -144,3 +144,23 @@ button:hover {
   margin: auto;
   border-radius: 10px;
 }
+.toolbar button {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: #eee;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.toolbar button:hover {
+  transform: scale(1.1);
+  background: #ddd;
+}
+
+.gallery img {
+  border-radius: 6px;
+  transition: transform 0.2s;
+}
+.gallery img:hover {
+  transform: scale(1.05);
+}
