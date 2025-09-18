@@ -8,15 +8,15 @@ import os
 from database import SessionLocal, engine, Base
 from models import User, Diagram
 
-# Create DB tables
+# Create tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# Allow frontend requests
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # Restrict to your deployed domain later
+    allow_origins=["*"],   # for production, restrict this to your frontend domain
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -25,7 +25,7 @@ app.add_middleware(
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Dependency to get DB session
+# Dependency for DB session
 def get_db():
     db = SessionLocal()
     try:
@@ -124,10 +124,9 @@ def delete_diagram(diagram_id: int, db: Session = Depends(get_db)):
     return {"message": "Diagram deleted"}
 
 # ----------------------------
-# FRONTEND (React build)
+# SERVE FRONTEND (React dist/)
 # ----------------------------
 
-# Serve built React frontend from dist/
 frontend_path = os.path.join(os.path.dirname(__file__), "dist")
 if os.path.exists(frontend_path):
     app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
