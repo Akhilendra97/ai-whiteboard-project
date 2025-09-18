@@ -4,24 +4,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from database import engine, SessionLocal
+from passlib.hash import bcrypt
+from database import SessionLocal, engine
 import models
 
-# Create database tables
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# CORS
+# Allow frontend to connect
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # change to your frontend domain later
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# DB dependency
 def get_db():
     db = SessionLocal()
     try:
@@ -29,12 +28,46 @@ def get_db():
     finally:
         db.close()
 
-# Example API
-@app.get("/api/health")
-def health_check():
-    return {"status": "ok"}
+# ------------------ Auth APIs ------------------
 
-# Serve React frontend
+@app.post("/register")
+def register(user: dict, db: Session = Depends(get_db)):
+    if db.query(models.User).filter(models.User.username == user["username"]).first():
+        raise HTTPException(status_code=400, detail="Username already exists")
+    hashed_pw = bcrypt.hash(user["password"])
+    new_user = models.User(username=user["username"], password=hashed_pw)
+    db.add(new_user)
+    db.commit()
+    return {"message": "User registered successfully"}
+
+@app.post("/login")
+def login(user: dict, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(models.User.username == user["username"]).first()
+    if not db_user or not bcrypt.verify(user["password"], db_user.password):
+        raise HTTPException(status_code=400, detail="Invalid username or password")
+    return {"username": db_user.username}
+
+# ------------------ Diagrams ------------------
+
+@app.post("/save_diagram")
+def save_diagram(data: dict, db: Session = Depends(get_db)):
+    owner = db.query(models.User).filter(models.User.username == data["username"]).first()
+    if not owner:
+        raise HTTPException(status_code=400, detail="User not found")
+    diagram = models.Diagram(content=data["content"], owner_id=owner.id)
+    db.add(diagram)
+    db.commit()
+    return {"message": "Diagram saved"}
+
+@app.get("/get_diagrams/{username}")
+def get_diagrams(username: str, db: Session = Depends(get_db)):
+    owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        raise HTTPException(status_code=400, detail="User not found")
+    return [{"id": d.id, "content": d.content} for d in owner.diagrams]
+
+# ------------------ Serve React ------------------
+
 frontend_path = os.path.join(os.path.dirname(__file__), "dist")
 
 if os.path.exists(frontend_path):
@@ -43,6 +76,4 @@ if os.path.exists(frontend_path):
     @app.get("/{full_path:path}")
     async def serve_react(full_path: str):
         index_file = os.path.join(frontend_path, "index.html")
-        if os.path.exists(index_file):
-            return FileResponse(index_file)
-        raise HTTPException(status_code=404, detail="index.html not found")
+        return FileResponse(index_file)

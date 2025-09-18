@@ -1,8 +1,6 @@
 fastapi
 uvicorn[standard]
 sqlalchemy
-psycopg2-binary   # for PostgreSQL on Railway
-python-jose[cryptography]  # for JWT authentication
-passlib[bcrypt]   # for password hashing
-python-multipart  # for handling form data
-jinja2            # (optional if you later want templates)
+psycopg2-binary
+passlib[bcrypt]
+python-multipart
