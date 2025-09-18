@@ -10,48 +10,97 @@ export default function AuthPage({ onAuth }) {
     const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({
+        username: username.toLowerCase(), // ✅ ensure lowercase
+        password,
+      }),
     });
     const data = await res.json();
     if (res.ok) {
       localStorage.setItem("token", data.token);
       onAuth();
     } else {
-      alert(data.detail || "Failed");
+      alert(data.detail || "Authentication failed");
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white">
-      <div className="bg-white text-black shadow-2xl rounded-xl p-8 w-96 animate-fade-in">
-        <h1 className="text-2xl font-bold mb-4 text-center">
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "linear-gradient(to right, #6a11cb, #2575fc)",
+      }}
+    >
+      <div
+        style={{
+          background: "white",
+          padding: "30px",
+          borderRadius: "12px",
+          boxShadow: "0px 6px 20px rgba(0,0,0,0.3)",
+          width: "350px",
+          textAlign: "center",
+          animation: "fadeIn 0.8s ease-in-out",
+        }}
+      >
+        <h1 style={{ fontSize: "1.8rem", marginBottom: "20px" }}>
           {isLogin ? "🔐 Login" : "📝 Register"}
         </h1>
         <input
           type="text"
           placeholder="Username"
-          className="w-full p-2 mb-3 border rounded"
+          style={{
+            width: "100%",
+            padding: "10px",
+            marginBottom: "12px",
+            borderRadius: "6px",
+            border: "1px solid #ccc",
+          }}
           value={username}
           onChange={(e) => setUsername(e.target.value)}
         />
         <input
           type="password"
           placeholder="Password"
-          className="w-full p-2 mb-3 border rounded"
+          style={{
+            width: "100%",
+            padding: "10px",
+            marginBottom: "12px",
+            borderRadius: "6px",
+            border: "1px solid #ccc",
+          }}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
         <button
           onClick={handleAuth}
-          className="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 transition"
+          style={{
+            width: "100%",
+            padding: "10px",
+            background: "linear-gradient(to right, #2575fc, #6a11cb)",
+            color: "white",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+            fontWeight: "bold",
+          }}
         >
           {isLogin ? "Login" : "Register"}
         </button>
         <p
-          className="mt-4 text-center text-blue-600 cursor-pointer"
+          style={{
+            marginTop: "15px",
+            color: "#2575fc",
+            cursor: "pointer",
+            fontWeight: "500",
+          }}
           onClick={() => setIsLogin(!isLogin)}
         >
-          {isLogin ? "New user? Register here" : "Already registered? Login here"}
+          {isLogin
+            ? "New here? Create an account"
+            : "Already registered? Login here"}
         </p>
       </div>
     </div>

@@ -57,8 +57,7 @@ export default function Whiteboard() {
   const undo = () => {
     if (history.length === 0) return;
     const prev = [...history];
-    const last = prev.pop();
-    setRedoStack([...redoStack, last]);
+    prev.pop();
     setHistory(prev);
 
     const img = new Image();
@@ -95,7 +94,15 @@ export default function Whiteboard() {
       }}
     >
       <h1 style={{ fontSize: "2rem", marginBottom: "20px" }}>🎨 AI Whiteboard</h1>
-      <div style={{ display: "flex", justifyContent: "center", gap: "10px", flexWrap: "wrap", marginBottom: "20px" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: "12px",
+          flexWrap: "wrap",
+          marginBottom: "20px",
+        }}
+      >
         <ChromePicker color={color} onChange={(c) => setColor(c.hex)} />
         <input
           type="range"
@@ -104,12 +111,43 @@ export default function Whiteboard() {
           value={brushSize}
           onChange={(e) => setBrushSize(e.target.value)}
         />
-        <button onClick={() => setTool("brush")}>Brush</button>
-        <button onClick={() => setTool("eraser")}>Eraser</button>
-        <button onClick={undo}>Undo</button>
-        <button onClick={redo}>Redo</button>
-        <button onClick={download}>Save PNG</button>
-        <button onClick={() => setDarkMode(!darkMode)}>
+        {["Brush", "Eraser", "Undo", "Redo", "Save PNG"].map((btn, i) => (
+          <button
+            key={i}
+            onClick={() => {
+              if (btn === "Brush") setTool("brush");
+              if (btn === "Eraser") setTool("eraser");
+              if (btn === "Undo") undo();
+              if (btn === "Redo") redo();
+              if (btn === "Save PNG") download();
+            }}
+            style={{
+              padding: "6px 12px",
+              background: "#2575fc",
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontSize: "14px",
+              fontWeight: "500",
+            }}
+          >
+            {btn}
+          </button>
+        ))}
+        <button
+          onClick={() => setDarkMode(!darkMode)}
+          style={{
+            padding: "6px 12px",
+            background: darkMode ? "orange" : "black",
+            color: "white",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+            fontSize: "14px",
+            fontWeight: "500",
+          }}
+        >
           {darkMode ? "☀️ Light" : "🌙 Dark"}
         </button>
       </div>
