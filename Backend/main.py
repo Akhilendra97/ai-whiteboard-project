@@ -1,39 +1,37 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine
 from models import Base, User, Diagram
-from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 from datetime import datetime, timedelta
 import os
 
-from fastapi.middleware.cors import CORSMiddleware
-
-# ========================================
-# Setup
-# ========================================
+# Init DB
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For dev. In prod, restrict to your domain
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-SECRET_KEY = "mysecret"
+# Auth setup
+SECRET_KEY = "supersecretkey"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-
-# ========================================
-# DB Dependency
-# ========================================
+# Dependency: DB session
 def get_db():
     db = SessionLocal()
     try:
@@ -42,86 +40,69 @@ def get_db():
         db.close()
 
 
-# ========================================
-# Auth Helpers
-# ========================================
-def create_access_token(data: dict, expires_delta: timedelta = None):
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    credentials_exception = HTTPException(status_code=401, detail="Invalid credentials")
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-    user = db.query(User).filter(User.username == username).first()
-    if user is None:
-        raise credentials_exception
-    return user
-
-
-# ========================================
-# Auth Routes
-# ========================================
+# ========== AUTH ROUTES ==========
 @app.post("/register")
-def register(data: dict, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.username == data["username"]).first():
+def register(user: dict, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.username == user["username"]).first()
+    if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
-    new_user = User(username=data["username"], password=data["password"])
+    hashed_pw = pwd_context.hash(user["password"])
+    new_user = User(username=user["username"], hashed_password=hashed_pw)
     db.add(new_user)
     db.commit()
-    return {"message": "User registered"}
+    db.refresh(new_user)
+    return {"msg": "User created successfully"}
 
 
 @app.post("/login")
-def login(data: dict, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == data["username"], User.password == data["password"]).first()
-    if not user:
-        raise HTTPException(status_code=400, detail="Invalid username or password")
-    token = create_access_token({"sub": user.username}, timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+def login(user: dict, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.username == user["username"]).first()
+    if not db_user or not pwd_context.verify(user["password"], db_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+    token = create_access_token({"sub": db_user.username})
     return {"token": token}
 
 
-# ========================================
-# Diagram Routes (with Title support)
-# ========================================
+# ========== DIAGRAM ROUTES ==========
 @app.post("/save_diagram")
-def save_diagram(data: dict, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    new_diagram = Diagram(user_id=user.id, title=data.get("title", "Untitled"), image=data["image"])
-    db.add(new_diagram)
+def save_diagram(payload: dict, db: Session = Depends(get_db)):
+    diagram = Diagram(
+        title=payload["title"],
+        content=payload["content"],
+        owner=payload["username"],
+    )
+    db.add(diagram)
     db.commit()
-    db.refresh(new_diagram)
-    return {"id": new_diagram.id, "title": new_diagram.title}
+    db.refresh(diagram)
+    return {"msg": "Diagram saved", "id": diagram.id}
 
 
-@app.get("/get_diagrams")
-def get_diagrams(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    diagrams = db.query(Diagram).filter(Diagram.user_id == user.id).all()
-    return [{"id": d.id, "title": d.title, "image": d.image} for d in diagrams]
-
-
-@app.put("/rename_diagram/{diagram_id}")
-def rename_diagram(diagram_id: int, data: dict, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    diagram = db.query(Diagram).filter(Diagram.id == diagram_id, Diagram.user_id == user.id).first()
-    if not diagram:
-        raise HTTPException(status_code=404, detail="Diagram not found")
-    diagram.title = data["title"]
-    db.commit()
-    return {"message": "Renamed", "title": diagram.title}
+@app.get("/get_diagrams/{username}")
+def get_diagrams(username: str, db: Session = Depends(get_db)):
+    return db.query(Diagram).filter(Diagram.owner == username).all()
 
 
 @app.delete("/delete_diagram/{diagram_id}")
-def delete_diagram(diagram_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    diagram = db.query(Diagram).filter(Diagram.id == diagram_id, Diagram.user_id == user.id).first()
+def delete_diagram(diagram_id: int, db: Session = Depends(get_db)):
+    diagram = db.query(Diagram).filter(Diagram.id == diagram_id).first()
     if not diagram:
         raise HTTPException(status_code=404, detail="Diagram not found")
     db.delete(diagram)
     db.commit()
-    return {"message": "Deleted"}
+    return {"msg": "Diagram deleted"}
+
+
+# ========== FRONTEND ==========
+if os.path.exists("dist"):
+    app.mount("/", StaticFiles(directory="dist", html=True), name="frontend")
+
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        return FileResponse("dist/index.html")
