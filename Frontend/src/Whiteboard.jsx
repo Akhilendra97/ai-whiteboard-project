@@ -127,13 +127,17 @@ export default function Whiteboard({ onLogout }) {
             <ChromePicker color={color} onChange={(c) => setColor(c.hex)} />
           </div>
 
-          {/* Brush size slider */}
+          {/* Smaller Brush Size Slider */}
           <input
             type="range"
             min="2"
             max="50"
             value={brushSize}
             onChange={(e) => setBrushSize(e.target.value)}
+            style={{
+              width: "80px",
+              cursor: "pointer",
+            }}
           />
 
           {/* Toolbar Buttons */}
@@ -148,7 +152,7 @@ export default function Whiteboard({ onLogout }) {
                 if (btn === "Save") download();
               }}
               style={{
-                padding: "4px 8px",
+                padding: "4px 10px",
                 background: "#2575fc",
                 color: "white",
                 border: "none",
@@ -166,7 +170,7 @@ export default function Whiteboard({ onLogout }) {
           <button
             onClick={onLogout}
             style={{
-              padding: "4px 8px",
+              padding: "4px 10px",
               background: "crimson",
               color: "white",
               border: "none",
