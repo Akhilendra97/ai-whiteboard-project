@@ -1,21 +1,15 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, String, Text
 from database import Base
 
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
-    password = Column(String)
-
-    diagrams = relationship("Diagram", back_populates="owner")
-
+    username = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
 
 class Diagram(Base):
     __tablename__ = "diagrams"
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, default="Untitled")
-    image = Column(String)  # Base64 Image
-    user_id = Column(Integer, ForeignKey("users.id"))
-
-    owner = relationship("User", back_populates="diagrams")
+    title = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    owner = Column(String, nullable=False)
