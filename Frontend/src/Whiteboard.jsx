@@ -7,15 +7,15 @@ export default function Whiteboard() {
   const [drawing, setDrawing] = useState(false);
   const [color, setColor] = useState("#000000");
   const [brushSize, setBrushSize] = useState(5);
-  const [tool, setTool] = useState("brush"); // brush, eraser, line, rect, circle, highlighter
+  const [tool, setTool] = useState("brush");
   const [darkMode, setDarkMode] = useState(false);
   const [history, setHistory] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    canvas.width = window.innerWidth - 300;
-    canvas.height = window.innerHeight - 200;
+    canvas.width = window.innerWidth - 200;
+    canvas.height = window.innerHeight - 250;
     const ctx = canvas.getContext("2d");
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
@@ -86,9 +86,16 @@ export default function Whiteboard() {
   };
 
   return (
-    <div className={`${darkMode ? "bg-gray-900 text-white" : "bg-gray-100"} min-h-screen p-4`}>
-      <h1 className="text-3xl font-bold text-center mb-4 animate-pulse">🎨 AI Whiteboard</h1>
-      <div className="flex gap-4 mb-4 justify-center">
+    <div
+      style={{
+        background: darkMode ? "#1e1e1e" : "#f3f3f3",
+        minHeight: "100vh",
+        padding: "20px",
+        textAlign: "center",
+      }}
+    >
+      <h1 style={{ fontSize: "2rem", marginBottom: "20px" }}>🎨 AI Whiteboard</h1>
+      <div style={{ display: "flex", justifyContent: "center", gap: "10px", flexWrap: "wrap", marginBottom: "20px" }}>
         <ChromePicker color={color} onChange={(c) => setColor(c.hex)} />
         <input
           type="range"
@@ -97,18 +104,12 @@ export default function Whiteboard() {
           value={brushSize}
           onChange={(e) => setBrushSize(e.target.value)}
         />
-        <button className="px-3 py-1 bg-blue-500 text-white rounded" onClick={() => setTool("brush")}>
-          Brush
-        </button>
-        <button className="px-3 py-1 bg-red-500 text-white rounded" onClick={() => setTool("eraser")}>
-          Eraser
-        </button>
-        <button className="px-3 py-1 bg-yellow-500 text-black rounded" onClick={undo}>Undo</button>
-        <button className="px-3 py-1 bg-green-500 text-black rounded" onClick={redo}>Redo</button>
-        <button className="px-3 py-1 bg-purple-500 text-white rounded" onClick={download}>
-          Save PNG
-        </button>
-        <button className="px-3 py-1 bg-gray-700 text-white rounded" onClick={() => setDarkMode(!darkMode)}>
+        <button onClick={() => setTool("brush")}>Brush</button>
+        <button onClick={() => setTool("eraser")}>Eraser</button>
+        <button onClick={undo}>Undo</button>
+        <button onClick={redo}>Redo</button>
+        <button onClick={download}>Save PNG</button>
+        <button onClick={() => setDarkMode(!darkMode)}>
           {darkMode ? "☀️ Light" : "🌙 Dark"}
         </button>
       </div>
@@ -118,7 +119,12 @@ export default function Whiteboard() {
         onMouseMove={draw}
         onMouseUp={stopDrawing}
         onMouseLeave={stopDrawing}
-        className="border-4 border-gray-700 shadow-xl rounded-lg bg-white"
+        style={{
+          border: "3px solid #444",
+          borderRadius: "8px",
+          background: "white",
+          boxShadow: "0px 4px 12px rgba(0,0,0,0.2)",
+        }}
       />
     </div>
   );
