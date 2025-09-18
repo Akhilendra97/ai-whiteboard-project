@@ -1,75 +1,69 @@
 import React, { useState } from "react";
+import API_URL from "./config";
 
 export default function AuthPage({ onAuth }) {
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const API = ""; // set to "" to call same origin
 
   const handleAuth = async () => {
-    if (!username || !password) {
-      alert("Please enter username and password");
-      return;
-    }
     const endpoint = isLogin ? "/login" : "/register";
     try {
-      const res = await fetch(`${API}${endpoint}`, {
+      const res = await fetch(`${API_URL}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.toLowerCase(), password }),
+        body: JSON.stringify({ username, password }),
       });
+      const data = await res.json();
       if (res.ok) {
-        // login returns { username } in our backend; register returns success message
-        if (isLogin) {
-          const data = await res.json();
-          onAuth(data.username);
-        } else {
-          alert("Registered. Now login.");
-          setIsLogin(true);
-        }
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("username", username);
+        onAuth();
       } else {
-        const err = await res.json();
-        alert(err.detail || "Authentication failed");
+        alert(data.detail || "Failed");
       }
-    } catch (e) {
-      alert("Network error: " + e.message);
+    } catch (err) {
+      alert("Network error");
     }
   };
 
   return (
-    <div style={styles.page}>
-      <div style={styles.card} className="auth-card">
-        <h2 style={{ marginBottom: 12 }}>{isLogin ? "🔐 Login" : "📝 Register"}</h2>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white">
+      <div className="bg-white text-black shadow-2xl rounded-xl p-8 w-96 animate-fade-in">
+        <h1 className="text-2xl font-bold mb-4 text-center">
+          {isLogin ? "🔐 Login" : "📝 Register"}
+        </h1>
         <input
+          type="text"
+          placeholder="Username"
+          className="w-full p-2 mb-3 border rounded"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          placeholder="Username"
-          style={styles.input}
         />
         <input
+          type="password"
+          placeholder="Password"
+          className="w-full p-2 mb-3 border rounded"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          type="password"
-          style={styles.input}
         />
-        <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 8 }}>
-          <button onClick={handleAuth} style={styles.primaryBtn}>
-            {isLogin ? "Login" : "Register"}
-          </button>
-          <button
-            onClick={() => {
-              setIsLogin(!isLogin);
-            }}
-            style={styles.ghostBtn}
-          >
-            {isLogin ? "Create account" : "Use existing"}
-          </button>
-        </div>
+        <button
+          onClick={handleAuth}
+          className="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 transition"
+        >
+          {isLogin ? "Login" : "Register"}
+        </button>
+        <p
+          className="mt-4 text-center text-blue-600 cursor-pointer"
+          onClick={() => setIsLogin(!isLogin)}
+        >
+          {isLogin ? "New user? Register here" : "Already registered? Login here"}
+        </p>
       </div>
     </div>
   );
 }
+
 
 const styles = {
   page: {
