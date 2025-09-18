@@ -1,27 +1,13 @@
 import React, { useState } from "react";
-import Whiteboard from "./Whiteboard";
 import AuthPage from "./AuthPage";
+import Whiteboard from "./Whiteboard";
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+export default function App() {
+  const [username, setUsername] = useState(null);
 
-  const handleLogin = () => {
-    setIsAuthenticated(true);
-  };
-
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-  };
-
-  return (
-    <>
-      {isAuthenticated ? (
-        <Whiteboard onLogout={handleLogout} />
-      ) : (
-        <AuthPage onAuth={handleLogin} />
-      )}
-    </>
+  return username ? (
+    <Whiteboard username={username} onLogout={() => setUsername(null)} />
+  ) : (
+    <AuthPage onAuth={(u) => setUsername(u)} />
   );
 }
-
-export default App;
