@@ -1,27 +1,27 @@
+import os
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from database import engine, SessionLocal
 import models
-import os
-from fastapi.responses import FileResponse
 
-# Create tables
+# Create database tables
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# Allow frontend to talk to backend
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # change later to your domain
+    allow_origins=["*"],  # change to your frontend domain later
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Dependency to get DB session
+# DB dependency
 def get_db():
     db = SessionLocal()
     try:
@@ -29,29 +29,20 @@ def get_db():
     finally:
         db.close()
 
-# --- Example API ---
+# Example API
 @app.get("/api/health")
 def health_check():
     return {"status": "ok"}
 
-# --- User register/login & diagrams API would be here ---
-# (already in your previous models + auth setup)
-
-
-# --- Serve React frontend ---
+# Serve React frontend
 frontend_path = os.path.join(os.path.dirname(__file__), "dist")
 
-# Mount static files
 if os.path.exists(frontend_path):
-    app.mount(
-        "/static",
-        StaticFiles(directory=os.path.join(frontend_path, "assets")),
-        name="static",
-    )
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_path, "assets")), name="assets")
 
     @app.get("/{full_path:path}")
-    async def serve_react_app(full_path: str):
-        index_path = os.path.join(frontend_path, "index.html")
-        if os.path.exists(index_path):
-            return FileResponse(index_path)
-        raise HTTPException(status_code=404, detail="Page not found")
+    async def serve_react(full_path: str):
+        index_file = os.path.join(frontend_path, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        raise HTTPException(status_code=404, detail="index.html not found")
