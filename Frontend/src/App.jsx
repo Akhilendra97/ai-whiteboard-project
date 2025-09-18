@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import Whiteboard from "./components/Whiteboard";
+import Whiteboard from "./Whiteboard";
 
 function App() {
   const [user, setUser] = useState(null);
