@@ -13,24 +13,36 @@ export default function Whiteboard({ onLogout }) {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    canvas.width = 800;
-    canvas.height = 500;
+    canvas.width = window.innerWidth > 900 ? 800 : window.innerWidth - 40;
+    canvas.height = window.innerHeight > 600 ? 500 : window.innerHeight - 200;
     const ctx = canvas.getContext("2d");
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctxRef.current = ctx;
   }, []);
 
-  const startDrawing = (e) => {
-    const { offsetX, offsetY } = e.nativeEvent;
+  // Convert touch events into mouse-like coordinates
+  const getTouchPos = (touchEvent) => {
+    const rect = canvasRef.current.getBoundingClientRect();
+    const touch = touchEvent.touches[0];
+    return {
+      offsetX: touch.clientX - rect.left,
+      offsetY: touch.clientY - rect.top,
+    };
+  };
+
+  const startDrawing = (e, isTouch = false) => {
+    e.preventDefault();
+    const { offsetX, offsetY } = isTouch ? getTouchPos(e) : e.nativeEvent;
     ctxRef.current.beginPath();
     ctxRef.current.moveTo(offsetX, offsetY);
     setDrawing(true);
   };
 
-  const draw = (e) => {
+  const draw = (e, isTouch = false) => {
     if (!drawing) return;
-    const { offsetX, offsetY } = e.nativeEvent;
+    e.preventDefault();
+    const { offsetX, offsetY } = isTouch ? getTouchPos(e) : e.nativeEvent;
 
     if (tool === "brush") {
       ctxRef.current.strokeStyle = color;
@@ -45,8 +57,9 @@ export default function Whiteboard({ onLogout }) {
     }
   };
 
-  const stopDrawing = () => {
+  const stopDrawing = (e) => {
     if (!drawing) return;
+    e.preventDefault();
     ctxRef.current.closePath();
     setDrawing(false);
     setHistory([...history, canvasRef.current.toDataURL()]);
@@ -100,7 +113,8 @@ export default function Whiteboard({ onLogout }) {
           borderRadius: "12px",
           boxShadow: "0px 6px 20px rgba(0,0,0,0.3)",
           textAlign: "center",
-          width: "900px",
+          width: "95%",
+          maxWidth: "900px",
         }}
       >
         <h1
@@ -184,18 +198,22 @@ export default function Whiteboard({ onLogout }) {
           </button>
         </div>
 
-        {/* Canvas */}
+        {/* Canvas with both mouse + touch support */}
         <canvas
           ref={canvasRef}
-          onMouseDown={startDrawing}
-          onMouseMove={draw}
+          onMouseDown={(e) => startDrawing(e)}
+          onMouseMove={(e) => draw(e)}
           onMouseUp={stopDrawing}
           onMouseLeave={stopDrawing}
+          onTouchStart={(e) => startDrawing(e, true)}
+          onTouchMove={(e) => draw(e, true)}
+          onTouchEnd={stopDrawing}
           style={{
             border: "3px solid #444",
             borderRadius: "8px",
             background: "white",
             boxShadow: "0px 4px 12px rgba(0,0,0,0.2)",
+            touchAction: "none", // prevents scrolling while drawing
           }}
         />
       </div>
