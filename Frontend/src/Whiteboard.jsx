@@ -103,17 +103,31 @@ export default function Whiteboard({ onLogout }) {
           width: "900px",
         }}
       >
-        <h1 style={{ fontSize: "2rem", marginBottom: "20px" }}>🎨 AI Whiteboard</h1>
+        <h1
+          style={{
+            fontSize: "1.8rem",
+            marginBottom: "20px",
+            fontWeight: "bold",
+          }}
+        >
+          🎨 AI Whiteboard
+        </h1>
         <div
           style={{
             display: "flex",
             justifyContent: "center",
-            gap: "8px",
+            gap: "6px",
             flexWrap: "wrap",
             marginBottom: "20px",
+            alignItems: "center",
           }}
         >
-          <ChromePicker color={color} onChange={(c) => setColor(c.hex)} />
+          {/* Smaller ChromePicker */}
+          <div style={{ transform: "scale(0.7)", transformOrigin: "top left" }}>
+            <ChromePicker color={color} onChange={(c) => setColor(c.hex)} />
+          </div>
+
+          {/* Brush size slider */}
           <input
             type="range"
             min="2"
@@ -121,7 +135,9 @@ export default function Whiteboard({ onLogout }) {
             value={brushSize}
             onChange={(e) => setBrushSize(e.target.value)}
           />
-          {["Brush", "Eraser", "Undo", "Redo", "Save PNG"].map((btn, i) => (
+
+          {/* Toolbar Buttons */}
+          {["Brush", "Eraser", "Undo", "Redo", "Save"].map((btn, i) => (
             <button
               key={i}
               onClick={() => {
@@ -129,38 +145,42 @@ export default function Whiteboard({ onLogout }) {
                 if (btn === "Eraser") setTool("eraser");
                 if (btn === "Undo") undo();
                 if (btn === "Redo") redo();
-                if (btn === "Save PNG") download();
+                if (btn === "Save") download();
               }}
               style={{
-                padding: "6px 10px",
+                padding: "4px 8px",
                 background: "#2575fc",
                 color: "white",
                 border: "none",
-                borderRadius: "5px",
+                borderRadius: "4px",
                 cursor: "pointer",
-                fontSize: "13px",
+                fontSize: "12px",
                 fontWeight: "500",
               }}
             >
               {btn}
             </button>
           ))}
+
+          {/* Logout Button */}
           <button
             onClick={onLogout}
             style={{
-              padding: "6px 10px",
+              padding: "4px 8px",
               background: "crimson",
               color: "white",
               border: "none",
-              borderRadius: "5px",
+              borderRadius: "4px",
               cursor: "pointer",
-              fontSize: "13px",
+              fontSize: "12px",
               fontWeight: "500",
             }}
           >
             🚪 Logout
           </button>
         </div>
+
+        {/* Canvas */}
         <canvas
           ref={canvasRef}
           onMouseDown={startDrawing}
