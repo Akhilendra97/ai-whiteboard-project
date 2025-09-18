@@ -1,123 +1,125 @@
 import React, { useRef, useState, useEffect } from "react";
+import { ChromePicker } from "react-color";
 
-const Whiteboard = ({ username }) => {
+export default function Whiteboard() {
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
-  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawing, setDrawing] = useState(false);
   const [color, setColor] = useState("#000000");
-  const [lineWidth, setLineWidth] = useState(3);
-  const [savedDiagrams, setSavedDiagrams] = useState([]);
-
-  const API_BASE = "";
+  const [brushSize, setBrushSize] = useState(5);
+  const [tool, setTool] = useState("brush"); // brush, eraser, line, rect, circle, highlighter
+  const [darkMode, setDarkMode] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    canvas.width = 800;
-    canvas.height = 500;
+    canvas.width = window.innerWidth - 300;
+    canvas.height = window.innerHeight - 200;
     const ctx = canvas.getContext("2d");
     ctx.lineCap = "round";
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineWidth;
+    ctx.lineJoin = "round";
     ctxRef.current = ctx;
-  }, [color, lineWidth]);
+  }, []);
 
   const startDrawing = (e) => {
+    const { offsetX, offsetY } = e.nativeEvent;
     ctxRef.current.beginPath();
-    ctxRef.current.moveTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
-    setIsDrawing(true);
+    ctxRef.current.moveTo(offsetX, offsetY);
+    setDrawing(true);
   };
 
   const draw = (e) => {
-    if (!isDrawing) return;
-    ctxRef.current.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
-    ctxRef.current.stroke();
+    if (!drawing) return;
+    const { offsetX, offsetY } = e.nativeEvent;
+
+    if (tool === "brush") {
+      ctxRef.current.strokeStyle = color;
+      ctxRef.current.lineWidth = brushSize;
+      ctxRef.current.lineTo(offsetX, offsetY);
+      ctxRef.current.stroke();
+    } else if (tool === "eraser") {
+      ctxRef.current.strokeStyle = darkMode ? "#1e1e1e" : "#ffffff";
+      ctxRef.current.lineWidth = brushSize + 5;
+      ctxRef.current.lineTo(offsetX, offsetY);
+      ctxRef.current.stroke();
+    }
   };
 
   const stopDrawing = () => {
+    if (!drawing) return;
     ctxRef.current.closePath();
-    setIsDrawing(false);
+    setDrawing(false);
+    setHistory([...history, canvasRef.current.toDataURL()]);
+    setRedoStack([]);
   };
 
-  const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    ctxRef.current.clearRect(0, 0, canvas.width, canvas.height);
-  };
+  const undo = () => {
+    if (history.length === 0) return;
+    const prev = [...history];
+    const last = prev.pop();
+    setRedoStack([...redoStack, last]);
+    setHistory(prev);
 
-  // Save canvas to backend
-  const saveCanvas = async () => {
-    const canvas = canvasRef.current;
-    const dataUrl = canvas.toDataURL(); // base64 PNG
-    const res = await fetch(`${API_BASE}/save_diagram`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, content: dataUrl }),
-    });
-    if (res.ok) {
-      alert("Diagram saved ✅");
-      loadDiagrams();
-    } else {
-      alert("Failed to save ❌");
-    }
-  };
-
-  // Load diagrams from backend
-  const loadDiagrams = async () => {
-    const res = await fetch(`${API_BASE}/get_diagrams/${username}`);
-    if (res.ok) {
-      const data = await res.json();
-      setSavedDiagrams(data);
-    }
-  };
-
-  // Load selected diagram onto canvas
-  const loadToCanvas = (dataUrl) => {
-    const canvas = canvasRef.current;
-    const ctx = ctxRef.current;
     const img = new Image();
-    img.src = dataUrl;
-    img.onload = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0);
-    };
+    img.src = prev[prev.length - 1] || "";
+    img.onload = () => ctxRef.current.drawImage(img, 0, 0);
+  };
+
+  const redo = () => {
+    if (redoStack.length === 0) return;
+    const newRedo = [...redoStack];
+    const restored = newRedo.pop();
+    setHistory([...history, restored]);
+    setRedoStack(newRedo);
+
+    const img = new Image();
+    img.src = restored;
+    img.onload = () => ctxRef.current.drawImage(img, 0, 0);
+  };
+
+  const download = () => {
+    const link = document.createElement("a");
+    link.download = "whiteboard.png";
+    link.href = canvasRef.current.toDataURL();
+    link.click();
   };
 
   return (
-    <div>
-      <div className="toolbar">
-        <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
-        <input type="range" min="1" max="20" value={lineWidth} onChange={(e) => setLineWidth(e.target.value)} />
-        <button onClick={clearCanvas} className="btn gray">Clear</button>
-        <button onClick={saveCanvas} className="btn green">Save</button>
-        <button onClick={loadDiagrams} className="btn blue">Load Saved</button>
+    <div className={`${darkMode ? "bg-gray-900 text-white" : "bg-gray-100"} min-h-screen p-4`}>
+      <h1 className="text-3xl font-bold text-center mb-4 animate-pulse">🎨 AI Whiteboard</h1>
+      <div className="flex gap-4 mb-4 justify-center">
+        <ChromePicker color={color} onChange={(c) => setColor(c.hex)} />
+        <input
+          type="range"
+          min="2"
+          max="50"
+          value={brushSize}
+          onChange={(e) => setBrushSize(e.target.value)}
+        />
+        <button className="px-3 py-1 bg-blue-500 text-white rounded" onClick={() => setTool("brush")}>
+          Brush
+        </button>
+        <button className="px-3 py-1 bg-red-500 text-white rounded" onClick={() => setTool("eraser")}>
+          Eraser
+        </button>
+        <button className="px-3 py-1 bg-yellow-500 text-black rounded" onClick={undo}>Undo</button>
+        <button className="px-3 py-1 bg-green-500 text-black rounded" onClick={redo}>Redo</button>
+        <button className="px-3 py-1 bg-purple-500 text-white rounded" onClick={download}>
+          Save PNG
+        </button>
+        <button className="px-3 py-1 bg-gray-700 text-white rounded" onClick={() => setDarkMode(!darkMode)}>
+          {darkMode ? "☀️ Light" : "🌙 Dark"}
+        </button>
       </div>
-
       <canvas
         ref={canvasRef}
         onMouseDown={startDrawing}
         onMouseMove={draw}
         onMouseUp={stopDrawing}
         onMouseLeave={stopDrawing}
-        className="canvas"
+        className="border-4 border-gray-700 shadow-xl rounded-lg bg-white"
       />
-
-      {savedDiagrams.length > 0 && (
-        <div className="saved-gallery">
-          <h3>Saved Diagrams</h3>
-          <div className="gallery">
-            {savedDiagrams.map((d) => (
-              <img
-                key={d.id}
-                src={d.content}
-                alt="diagram"
-                onClick={() => loadToCanvas(d.content)}
-                className="thumb"
-              />
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
-};
-
-export default Whiteboard;
+}
