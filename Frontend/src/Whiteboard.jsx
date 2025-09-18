@@ -1,21 +1,20 @@
 import React, { useRef, useState, useEffect } from "react";
 import { ChromePicker } from "react-color";
 
-export default function Whiteboard() {
+export default function Whiteboard({ onLogout }) {
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
   const [color, setColor] = useState("#000000");
   const [brushSize, setBrushSize] = useState(5);
   const [tool, setTool] = useState("brush");
-  const [darkMode, setDarkMode] = useState(false);
   const [history, setHistory] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    canvas.width = window.innerWidth - 200;
-    canvas.height = window.innerHeight - 250;
+    canvas.width = 800;
+    canvas.height = 500;
     const ctx = canvas.getContext("2d");
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
@@ -39,7 +38,7 @@ export default function Whiteboard() {
       ctxRef.current.lineTo(offsetX, offsetY);
       ctxRef.current.stroke();
     } else if (tool === "eraser") {
-      ctxRef.current.strokeStyle = darkMode ? "#1e1e1e" : "#ffffff";
+      ctxRef.current.strokeStyle = "#ffffff";
       ctxRef.current.lineWidth = brushSize + 5;
       ctxRef.current.lineTo(offsetX, offsetY);
       ctxRef.current.stroke();
@@ -87,83 +86,95 @@ export default function Whiteboard() {
   return (
     <div
       style={{
-        background: darkMode ? "#1e1e1e" : "#f3f3f3",
         minHeight: "100vh",
-        padding: "20px",
-        textAlign: "center",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "linear-gradient(to right, #6a11cb, #2575fc)",
       }}
     >
-      <h1 style={{ fontSize: "2rem", marginBottom: "20px" }}>🎨 AI Whiteboard</h1>
       <div
         style={{
-          display: "flex",
-          justifyContent: "center",
-          gap: "12px",
-          flexWrap: "wrap",
-          marginBottom: "20px",
+          background: "white",
+          padding: "20px",
+          borderRadius: "12px",
+          boxShadow: "0px 6px 20px rgba(0,0,0,0.3)",
+          textAlign: "center",
+          width: "900px",
         }}
       >
-        <ChromePicker color={color} onChange={(c) => setColor(c.hex)} />
-        <input
-          type="range"
-          min="2"
-          max="50"
-          value={brushSize}
-          onChange={(e) => setBrushSize(e.target.value)}
-        />
-        {["Brush", "Eraser", "Undo", "Redo", "Save PNG"].map((btn, i) => (
+        <h1 style={{ fontSize: "2rem", marginBottom: "20px" }}>🎨 AI Whiteboard</h1>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            gap: "8px",
+            flexWrap: "wrap",
+            marginBottom: "20px",
+          }}
+        >
+          <ChromePicker color={color} onChange={(c) => setColor(c.hex)} />
+          <input
+            type="range"
+            min="2"
+            max="50"
+            value={brushSize}
+            onChange={(e) => setBrushSize(e.target.value)}
+          />
+          {["Brush", "Eraser", "Undo", "Redo", "Save PNG"].map((btn, i) => (
+            <button
+              key={i}
+              onClick={() => {
+                if (btn === "Brush") setTool("brush");
+                if (btn === "Eraser") setTool("eraser");
+                if (btn === "Undo") undo();
+                if (btn === "Redo") redo();
+                if (btn === "Save PNG") download();
+              }}
+              style={{
+                padding: "6px 10px",
+                background: "#2575fc",
+                color: "white",
+                border: "none",
+                borderRadius: "5px",
+                cursor: "pointer",
+                fontSize: "13px",
+                fontWeight: "500",
+              }}
+            >
+              {btn}
+            </button>
+          ))}
           <button
-            key={i}
-            onClick={() => {
-              if (btn === "Brush") setTool("brush");
-              if (btn === "Eraser") setTool("eraser");
-              if (btn === "Undo") undo();
-              if (btn === "Redo") redo();
-              if (btn === "Save PNG") download();
-            }}
+            onClick={onLogout}
             style={{
-              padding: "6px 12px",
-              background: "#2575fc",
+              padding: "6px 10px",
+              background: "crimson",
               color: "white",
               border: "none",
-              borderRadius: "6px",
+              borderRadius: "5px",
               cursor: "pointer",
-              fontSize: "14px",
+              fontSize: "13px",
               fontWeight: "500",
             }}
           >
-            {btn}
+            🚪 Logout
           </button>
-        ))}
-        <button
-          onClick={() => setDarkMode(!darkMode)}
+        </div>
+        <canvas
+          ref={canvasRef}
+          onMouseDown={startDrawing}
+          onMouseMove={draw}
+          onMouseUp={stopDrawing}
+          onMouseLeave={stopDrawing}
           style={{
-            padding: "6px 12px",
-            background: darkMode ? "orange" : "black",
-            color: "white",
-            border: "none",
-            borderRadius: "6px",
-            cursor: "pointer",
-            fontSize: "14px",
-            fontWeight: "500",
+            border: "3px solid #444",
+            borderRadius: "8px",
+            background: "white",
+            boxShadow: "0px 4px 12px rgba(0,0,0,0.2)",
           }}
-        >
-          {darkMode ? "☀️ Light" : "🌙 Dark"}
-        </button>
+        />
       </div>
-      <canvas
-        ref={canvasRef}
-        onMouseDown={startDrawing}
-        onMouseMove={draw}
-        onMouseUp={stopDrawing}
-        onMouseLeave={stopDrawing}
-        style={{
-          border: "3px solid #444",
-          borderRadius: "8px",
-          background: "white",
-          boxShadow: "0px 4px 12px rgba(0,0,0,0.2)",
-        }}
-      />
     </div>
   );
 }
