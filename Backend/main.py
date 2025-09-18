@@ -3,45 +3,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
-from pydantic import BaseModel
-import models
-from models import User, Diagram
-from database import engine, SessionLocal, Base
-
-# Create all tables
-Base.metadata.create_all(bind=engine)
-
+from database import engine, SessionLocal
+from models import Base, User, Diagram
 import os
 
-# Initialize FastAPI
+Base.metadata.create_all(bind=engine)
+
 app = FastAPI()
 
-# Database setup
-models.Base.metadata.create_all(bind=engine)
-
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# Allow frontend to call backend
+# CORS for frontend access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # You can restrict to your domain later
+    allow_origins=["*"],  # In production, set to your domain
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ----------- Auth Models -----------
-class UserCreate(BaseModel):
-    username: str
-    password: str
-
-class UserLogin(BaseModel):
-    username: str
-    password: str
-
-# ----------- DB Dependency -----------
+# Dependency to get DB session
 def get_db():
     db = SessionLocal()
     try:
@@ -49,32 +28,43 @@ def get_db():
     finally:
         db.close()
 
-# ----------- Auth Routes -----------
+# --- API Routes ---
 @app.post("/register")
-def register(user: UserCreate, db: Session = Depends(get_db)):
-    existing_user = db.query(models.User).filter(models.User.username == user.username).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Username already registered")
-    hashed_password = pwd_context.hash(user.password)
-    new_user = models.User(username=user.username, password=hashed_password)
+def register(username: str, password: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if user:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    new_user = User(username=username, password=password)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
     return {"message": "User registered successfully"}
 
 @app.post("/login")
-def login(user: UserLogin, db: Session = Depends(get_db)):
-    db_user = db.query(models.User).filter(models.User.username == user.username).first()
-    if not db_user or not pwd_context.verify(user.password, db_user.password):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+def login(username: str, password: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username, User.password == password).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid credentials")
     return {"message": "Login successful"}
 
-# ----------- Serve React Frontend -----------
-frontend_dist = os.path.join(os.path.dirname(__file__), "dist")
+@app.post("/save_diagram")
+def save_diagram(user_id: int, content: str, db: Session = Depends(get_db)):
+    new_diagram = Diagram(user_id=user_id, content=content)
+    db.add(new_diagram)
+    db.commit()
+    db.refresh(new_diagram)
+    return {"message": "Diagram saved", "id": new_diagram.id}
 
-if os.path.exists(frontend_dist):
-    app.mount("/static", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="static")
+@app.get("/diagrams/{user_id}")
+def get_diagrams(user_id: int, db: Session = Depends(get_db)):
+    diagrams = db.query(Diagram).filter(Diagram.user_id == user_id).all()
+    return diagrams
 
-    @app.get("/")
-    async def serve_frontend():
-        return FileResponse(os.path.join(frontend_dist, "index.html"))
+# --- Frontend Serving ---
+frontend_path = os.path.join(os.path.dirname(__file__), "dist")
+if os.path.exists(frontend_path):
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
+
+    @app.get("/{full_path:path}")
+    async def serve_react_app(full_path: str):
+        return FileResponse(os.path.join(frontend_path, "index.html"))
